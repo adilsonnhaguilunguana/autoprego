@@ -2790,7 +2790,6 @@ def processar_payload(data):
 # ==========================================================
 @app.route('/api/dados', methods=['POST'])
 def receber_dados():
-    """Rota OTIMIZADA para Railway - Recebe dados do ESP8266"""
     start_time = datetime.now()
     
     try:
@@ -2799,30 +2798,33 @@ def receber_dados():
         print(f"❌ Erro ao decodificar JSON: {e}")
         return jsonify({"error": "JSON inválido"}), 400
 
-    # ✅ VALIDAÇÃO ULTRA-RÁPIDA
+    print(f"🔔 Dados recebidos dos PZEMs")
+
+    servico_notificacoes.verificar_todas_notificacoes()
+    # Validação rápida
     if not data or 'api_key' not in data or data['api_key'] not in API_KEYS:
         return jsonify({"error": "Unauthorized"}), 401
 
-    print(f"📡 Dados recebidos do ESP8266 no Railway")
-
     try:
-        # ✅✅✅ PROCESSAMENTO OTIMIZADO PARA RAILWAY
+        # PROCESSAMENTO RÁPIDO
+        print("🔄 Iniciando processamento dos dados...")
         
-        # PASSO 1: Atualizar dados em memória (MUITO RÁPIDO)
+        # PASSO 1: Atualizar dados em memória (RÁPIDO)
         for i in [1, 2]:
             pzem_key = f'pzem{i}'
             if pzem_key in data:
-                # Atualização direta sem prints para ser mais rápido
+                print(f"📦 Atualizando {pzem_key} em memória")
                 for k, v in data[pzem_key].items():
                     if k in dados_pzem[pzem_key]:
                         dados_pzem[pzem_key][k] = v
                 dados_pzem[pzem_key]['conectado'] = True
                 dados_pzem[pzem_key]['ultima_atualizacao'] = datetime.now(timezone.utc)
 
-        # PASSO 2: ✅ ATUALIZAR SALDO (CRÍTICO)
+        # PASSO 2: ✅✅✅ ATUALIZAR SALDO COM CONSUMO (chama automaticamente verificar_e_controlar_reles)
+        print("🔄 Atualizando saldo com consumo real...")
         atualizar_saldo_com_consumo()
 
-        # PASSO 3: Salvar dados históricos de forma ASSÍNCRONA
+        # PASSO 3: Preparar dados para banco
         energy_entries = []
         for i in [1, 2]:
             pzem_key = f'pzem{i}'
@@ -2842,52 +2844,53 @@ def receber_dados():
                 except Exception as e:
                     print(f"❌ Erro ao criar EnergyData para {pzem_key}: {e}")
 
-        # ✅ SALVAMENTO EM LOTE (mais eficiente)
+        # PASSO 4: Salvar dados históricos (se houver)
         if energy_entries:
             try:
-                db.session.bulk_save_objects(energy_entries)
+                for entry in energy_entries:
+                    db.session.add(entry)
                 db.session.commit()
-                print(f"💾 {len(energy_entries)} registros salvos no Railway")
+                print(f"💾 {len(energy_entries)} registros salvos no banco")
             except Exception as e:
-                print(f"❌ Erro ao salvar no Railway: {e}")
+                print(f"❌ Erro ao salvar no banco: {e}")
                 db.session.rollback()
 
-        # PASSO 4: Atualizar estados dos relés (SE HOUVER DADOS)
+        # PASSO 5: Atualizar estados dos relés do payload
         if 'reles' in data:
+            print(f"🔔 Atualizando estados dos relés do payload")
             for r in data['reles']:
                 rele = Rele.query.get(r['id'])
-                if rele and rele.estado != r.get('estado', rele.estado):
-                    rele.estado = r.get('estado', rele.estado)
-                    # ✅ Log apenas se mudou
-                    print(f"🔌 Relé '{rele.nome}': {'LIGADO' if rele.estado else 'DESLIGADO'}")
+                if rele:
+                    # ✅ CORREÇÃO: Só atualiza se o estado for diferente
+                    if rele.estado != r.get('estado', rele.estado):
+                        rele.estado = r.get('estado', rele.estado)
+                        print(f"🔌 Relé '{rele.nome}': {'LIGADO' if rele.estado else 'DESLIGADO'}")
 
-            # ✅ Commit único para todos os relés
-            try:
-                db.session.commit()
-            except Exception as e:
-                print(f"❌ Erro ao salvar estados dos relés: {e}")
-                db.session.rollback()
+        # Commitar mudanças dos relés
+        try:
+            db.session.commit()
+            print("✅ Estados dos relés atualizados no banco")
+        except Exception as e:
+            print(f"❌ Erro ao salvar estados dos relés: {e}")
+            db.session.rollback()
 
-        # PASSO 5: ✅ VERIFICAÇÃO DE NOTIFICAÇÕES (fora do tempo crítico)
-        # Mover para fora do tempo de resposta do ESP
-        servico_notificacoes.verificar_todas_notificacoes()
-
-        # ✅ RESPOSTA IMEDIATA para o ESP (CRÍTICO)
+        # Calcular tempo de resposta
         response_time = (datetime.now() - start_time).total_seconds()
+        print(f"✅ Processamento completo em {response_time:.2f}s")
         
+        # ✅ RESPOSTA RÁPIDA para o ESP
         return jsonify({
             "status": "success", 
-            "message": "Dados recebidos no Railway",
+            "message": "Dados recebidos e processados",
             "records_saved": len(energy_entries),
-            "processing_time": f"{response_time:.2f}s",
-            "environment": "railway"
+            "processing_time": f"{response_time:.2f}s"
         }), 200
 
     except Exception as e:
-        print(f"❌ Erro no processamento Railway: {e}")
+        print(f"❌ Erro no processamento: {e}")
+        print(f"🔍 Traceback completo: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
-
 # ==========================================================
 @app.route('/api/debug-dados')
 def debug_dados():
@@ -3621,16 +3624,6 @@ def init_notificacoes():
     print("🔔 Sistema de notificações inicializado")
     # Limpa alertas antigos ao iniciar
     servico_notificacoes.limpar_alertas_antigos()
-
-
-    with app.app_context():
-        init_db()
-    init_notificacoes()
-    
-    # ✅ DEBUG CONTROLADO PARA PRODUÇÃO (NOVO)
-    debug_mode = not os.environ.get('RENDER')  # False no Render, True local
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
-
 # -----------------------------
 # Inicialização
 # -----------------------------
@@ -3639,14 +3632,6 @@ if __name__ == '__main__':
         init_db()
     init_notificacoes()
     
-    # ✅ PORTA DO RAILWAY (OBRIGATÓRIO)
-    port = int(os.environ.get('PORT', 5000))
-    
-    # ✅ DEBUG DESLIGADO no Railway (sempre False)
-    debug_mode = False
-    
-    print(f"🚀 Servidor Railway iniciado na porta {port}")
-    print(f"📊 Database: {app.config['SQLALCHEMY_DATABASE_URI'][:50]}...")
-    print(f"🔧 Debug: {debug_mode}")
-    
-    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+    # ✅ DEBUG CONTROLADO PARA PRODUÇÃO (NOVO)
+    debug_mode = not os.environ.get('RENDER')  # False no Render, True local
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
