@@ -49,6 +49,18 @@ migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'autenticacao'
 
+# ==========================================================
+# CRIAÇÃO AUTOMÁTICA DAS TABELAS NO RAILWAY
+# ==========================================================
+@app.before_first_request
+def criar_tabelas_automaticamente():
+    try:
+        print("📦 Verificando tabelas...")
+        db.create_all()
+        print("✅ Todas as tabelas foram criadas com sucesso!")
+    except Exception as e:
+        print("❌ Erro ao criar tabelas automaticamente:", e)
+
 # -----------------------------
 # Rotas Básicas
 # -----------------------------
