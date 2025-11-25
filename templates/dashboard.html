@@ -140,7 +140,7 @@ html
         --gradient-warning: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
         --gradient-danger: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
         --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        --shadow: 0 0.5rem 1rem rgba(4, 3, 3, 0.15);
         --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
         --border-radius: 0.75rem;
         --border-radius-sm: 0.5rem;
@@ -835,6 +835,32 @@ html
                     Luminosidade: <span id="r1-luz">--</span>
                 </div>
        </div>
+                <!-- Painel para Reset de KPIs -->
+            <div class="config-panel mt-3">
+                <h5><i class="bi bi-arrow-repeat"></i> Reset de KPIs</h5>
+
+                <div class="d-flex gap-3 align-items-center">
+                    <select id="select-reset-kpi" class="form-select" style="max-width:300px;">
+                        <option value="">-- Selecionar KPI --</option>
+                        <option value="reset-all">🔄 Resetar TODOS</option>
+
+                        <option value="kpi-current-power">Consumo Atual</option>
+                        <option value="kpi-today-energy">Energia Hoje (kWh)</option>
+                        <option value="kpi-today-cost">Custo Hoje</option>
+                        <option value="kpi-peak-today">Pico Diário</option>
+                        <option value="kpi-peak-time">Hora Pico Dia</option>
+                        <option value="kpi-savings">Saldo de Energia (%)</option>
+                        <option value="kpi-peak-weekly">Pico Semanal</option>
+                        <option value="kpi-peak-weekly-time">Hora Pico Semanal</option>
+                        <option value="kpi-peak-monthly">Pico Mensal</option>
+                        <option value="kpi-peak-monthly-time">Hora Pico Mensal</option>
+                    </select>
+
+                    <button class="btn btn-warning" onclick="resetarKPISelecionado()">
+                        <i class="bi bi-trash"></i> Resetar
+                    </button>
+                </div>
+            </div>
 
     </div>              
     </div>

@@ -252,6 +252,51 @@ function atualizarDadosPZEM(data) {
     elements.statusPzem2.className = `badge bg-${data.pzem2.conectado ? 'success' : 'danger'}`;
 }
 
+function resetarKPISelecionado() {
+    const select = document.getElementById("select-reset-kpi");
+    const id = select.value;
+
+    if (!id) {
+        showToast("Selecione um KPI para resetar!", "warning");
+        return;
+    }
+
+    if (id === "reset-all") {
+        resetarTodosKPIs();
+        showToast("Todos os KPIs foram zerados!", "success");
+        return;
+    }
+
+    const el = document.getElementById(id);
+
+    if (el) {
+        el.innerText = "0";
+        showToast(`KPI "${select.options[select.selectedIndex].text}" foi zerado!`, "success");
+    } else {
+        showToast("Erro: KPI não encontrado!", "danger");
+    }
+}
+
+function resetarTodosKPIs() {
+    const ids = [
+        "kpi-current-power",
+        "kpi-today-energy",
+        "kpi-today-cost",
+        "kpi-peak-today",
+        "kpi-peak-time",
+        "kpi-savings",
+        "kpi-peak-weekly",
+        "kpi-peak-weekly-time",
+        "kpi-peak-monthly",
+        "kpi-peak-monthly-time"
+    ];
+
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = "0";
+    });
+}
+
 // Atualizar KPIs
 async function atualizarKPIs(data) {
     const elements = {
