@@ -10,30 +10,34 @@ from config import Config
 import traceback
 from sqlalchemy import func
 
+
 ULTIMO_LDR = {"valorLuz": 0, "R1": 0}
 
-# ✅✅✅ CONFIGURAÇÃO EXCLUSIVA PARA RAILWAY
 print("🚀 Configurando para Railway...")
 
+# =========================================================
+# 1️⃣ CRIAÇÃO DO APP E CARREGAMENTO DO CONFIG
+# =========================================================
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# ✅ DATABASE URL DO RAILWAY (OBRIGATÓRIO)
+# =========================================================
+# 2️⃣ CONFIGURAÇÃO DO DATABASE DO RAILWAY
+# =========================================================
 database_url = os.environ.get('DATABASE_URL')
 if not database_url:
     print("❌ ERRO: DATABASE_URL não encontrada. Configure no Railway!")
-    # Pode continuar para testes, mas não funcionará sem database
-    database_url = 'sqlite:///temp.db'  # Fallback temporário
+    database_url = 'sqlite:///temp.db'  # fallback temporário para testes
 
-# Converter postgres:// para postgresql:// (Railway usa postgres://)
+# Converter postgres:// → postgresql://
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-print(f"✅ Database URL configurada para Railway")
+print("✅ Database URL configurada!")
 
-# ✅ CONFIGURAÇÕES OTIMIZADAS PARA RAILWAY
-app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # Respostas mais rápidas
+# Configurações de performance do SQLAlchemy no Railway
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
@@ -43,11 +47,33 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_timeout": 30,
 }
 
-# O resto do código continua igual...
+# =========================================================
+# 3️⃣ INICIALIZAÇÃO DO DB E MIGRATIONS
+# =========================================================
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# =========================================================
+# 4️⃣ LOGIN MANAGER
+# =========================================================
 login_manager = LoginManager(app)
 login_manager.login_view = 'autenticacao'
+
+# =========================================================
+# 5️⃣ IMPORTS DOS PICOS (AGORA QUE O DB EXISTE)
+# =========================================================
+from routes.picos import (
+    picos_bp,
+    obter_pico_do_dia,
+    obter_picos_semana_atual,
+    obter_pico_semanal,
+    obter_pico_mensal
+)
+
+# =========================================================
+# 6️⃣ REGISTRO DOS BLUEPRINTS
+# =========================================================
+app.register_blueprint(picos_bp)
 
 # ==========================================================
 # CRIAÇÃO AUTOMÁTICA DAS TABELAS NO RAILWAY (Flask 3.0+)
@@ -1869,220 +1895,6 @@ servico_notificacoes = ServicoNotificacoes()
 # ==========================================================
 # SISTEMA COMPLETO DE PICOS (DIÁRIO, SEMANAL, MENSAL)
 # ==========================================================
-
-def obter_pico_do_dia():
-    """Obtém o pico de consumo do dia atual do banco de dados"""
-    try:
-        hoje = datetime.utcnow().date()
-        
-        # Buscar pico do PZEM 1
-        pico_pzem1 = EnergyData.query.filter(
-            EnergyData.pzem_id == 1,
-            db.func.date(EnergyData.timestamp) == hoje
-        ).order_by(EnergyData.power.desc()).first()
-        
-        # Buscar pico do PZEM 2
-        pico_pzem2 = EnergyData.query.filter(
-            EnergyData.pzem_id == 2,
-            db.func.date(EnergyData.timestamp) == hoje
-        ).order_by(EnergyData.power.desc()).first()
-        
-        picos = []
-        if pico_pzem1:
-            picos.append({
-                'value': pico_pzem1.power,
-                'time': pico_pzem1.timestamp.strftime('%H:%M'),
-                'pzem': 1
-            })
-        if pico_pzem2:
-            picos.append({
-                'value': pico_pzem2.power,
-                'time': pico_pzem2.timestamp.strftime('%H:%M'),
-                'pzem': 2
-            })
-        
-        if picos:
-            # Encontrar o maior pico
-            maior_pico = max(picos, key=lambda x: x['value'])
-            return maior_pico
-        else:
-            # Se não há dados no banco, usar dados em tempo real
-            pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-            return {
-                'value': pico_atual,
-                'time': datetime.now().strftime('%H:%M'),
-                'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-            }
-            
-    except Exception as e:
-        print(f"❌ Erro ao obter pico do dia: {e}")
-        # Fallback para dados em tempo real
-        pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-        return {
-            'value': pico_atual,
-            'time': datetime.now().strftime('%H:%M'),
-            'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-        }
-
-def obter_picos_semana_atual():
-    """Obtém os picos de cada dia da semana atual"""
-    try:
-        hoje = datetime.utcnow().date()
-        inicio_semana = hoje - timedelta(days=hoje.weekday())  # Segunda-feira
-        dias_semana = []
-        picos_semana = []
-        labels_semana = []
-        
-        # Nomes dos dias da semana
-        nomes_dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-        
-        for i in range(7):
-            data = inicio_semana + timedelta(days=i)
-            dia_nome = nomes_dias[i]
-            
-            # Se for dia futuro, não buscar
-            if data > hoje:
-                picos_semana.append(0)
-                labels_semana.append(f"{dia_nome}")
-                continue
-            
-            # Buscar picos do dia
-            pico_pzem1 = EnergyData.query.filter(
-                EnergyData.pzem_id == 1,
-                db.func.date(EnergyData.timestamp) == data
-            ).order_by(EnergyData.power.desc()).first()
-            
-            pico_pzem2 = EnergyData.query.filter(
-                EnergyData.pzem_id == 2,
-                db.func.date(EnergyData.timestamp) == data
-            ).order_by(EnergyData.power.desc()).first()
-            
-            picos_dia = []
-            if pico_pzem1:
-                picos_dia.append(pico_pzem1.power)
-            if pico_pzem2:
-                picos_dia.append(pico_pzem2.power)
-            
-            pico_dia = max(picos_dia) if picos_dia else 0
-            picos_semana.append(pico_dia)
-            labels_semana.append(f"{dia_nome} ({data.day})")
-            
-        return {
-            "labels": labels_semana,
-            "values": picos_semana
-        }
-        
-    except Exception as e:
-        print(f"❌ Erro ao obter picos da semana: {e}")
-        # Fallback
-        return {
-            "labels": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
-            "values": [0, 0, 0, 0, 0, 0, 0]
-        }
-
-def obter_pico_semanal():
-    """Obtém o pico semanal (maior pico da semana atual)"""
-    try:
-        hoje = datetime.utcnow().date()
-        inicio_semana = hoje - timedelta(days=hoje.weekday())
-        
-        # Buscar maior pico da semana para PZEM 1
-        pico_semana_pzem1 = EnergyData.query.filter(
-            EnergyData.pzem_id == 1,
-            EnergyData.timestamp >= inicio_semana
-        ).order_by(EnergyData.power.desc()).first()
-        
-        # Buscar maior pico da semana para PZEM 2
-        pico_semana_pzem2 = EnergyData.query.filter(
-            EnergyData.pzem_id == 2,
-            EnergyData.timestamp >= inicio_semana
-        ).order_by(EnergyData.power.desc()).first()
-        
-        picos = []
-        if pico_semana_pzem1:
-            picos.append({
-                'value': pico_semana_pzem1.power,
-                'time': pico_semana_pzem1.timestamp.strftime('%d/%m %H:%M'),
-                'pzem': 1
-            })
-        if pico_semana_pzem2:
-            picos.append({
-                'value': pico_semana_pzem2.power,
-                'time': pico_semana_pzem2.timestamp.strftime('%d/%m %H:%M'),
-                'pzem': 2
-            })
-        
-        if picos:
-            maior_pico = max(picos, key=lambda x: x['value'])
-            return maior_pico
-        else:
-            pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-            return {
-                'value': pico_atual,
-                'time': datetime.now().strftime('%d/%m %H:%M'),
-                'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-            }
-            
-    except Exception as e:
-        print(f"❌ Erro ao obter pico semanal: {e}")
-        pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-        return {
-            'value': pico_atual,
-            'time': datetime.now().strftime('%d/%m %H:%M'),
-            'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-        }
-
-def obter_pico_mensal():
-    """Obtém o pico mensal (maior pico do mês atual)"""
-    try:
-        hoje = datetime.utcnow().date()
-        inicio_mes = hoje.replace(day=1)
-        
-        # Buscar maior pico do mês para PZEM 1
-        pico_mes_pzem1 = EnergyData.query.filter(
-            EnergyData.pzem_id == 1,
-            EnergyData.timestamp >= inicio_mes
-        ).order_by(EnergyData.power.desc()).first()
-        
-        # Buscar maior pico do mês para PZEM 2
-        pico_mes_pzem2 = EnergyData.query.filter(
-            EnergyData.pzem_id == 2,
-            EnergyData.timestamp >= inicio_mes
-        ).order_by(EnergyData.power.desc()).first()
-        
-        picos = []
-        if pico_mes_pzem1:
-            picos.append({
-                'value': pico_mes_pzem1.power,
-                'time': pico_mes_pzem1.timestamp.strftime('%d/%m %H:%M'),
-                'pzem': 1
-            })
-        if pico_mes_pzem2:
-            picos.append({
-                'value': pico_mes_pzem2.power,
-                'time': pico_mes_pzem2.timestamp.strftime('%d/%m %H:%M'),
-                'pzem': 2
-            })
-        
-        if picos:
-            maior_pico = max(picos, key=lambda x: x['value'])
-            return maior_pico
-        else:
-            pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-            return {
-                'value': pico_atual,
-                'time': datetime.now().strftime('%d/%m %H:%M'),
-                'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-            }
-            
-    except Exception as e:
-        print(f"❌ Erro ao obter pico mensal: {e}")
-        pico_atual = max(dados_pzem['pzem1']['power'], dados_pzem['pzem2']['power'])
-        return {
-            'value': pico_atual,
-            'time': datetime.now().strftime('%d/%m %H:%M'),
-            'pzem': 1 if dados_pzem['pzem1']['power'] > dados_pzem['pzem2']['power'] else 2
-        }
 
 def obter_energia_atual():
     """Obtém a energia atual (saldo) do sistema"""
@@ -3916,7 +3728,6 @@ def health_check():
             "timestamp": datetime.now().isoformat()
         }), 500
 
-
 # -----------------------------
 # Inicialização do banco
 # -----------------------------
@@ -3975,7 +3786,6 @@ def init_notificacoes():
 with app.app_context():
     init_db()
     init_notificacoes()
-
 
 # -----------------------------
 # Execução local (python app.py)
