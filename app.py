@@ -197,7 +197,7 @@ class ReleLog(db.Model):
             "modo_operacao": self.modo_operacao,
             "saldo_kwh": self.saldo_kwh
         }
-olha esse codigo:# ==========================================================
+# ==========================================================
 # ROTAS DE CONFIGURAÇÃO DE NOTIFICAÇÕES
 # ==========================================================
 
