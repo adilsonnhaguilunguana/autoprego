@@ -3269,7 +3269,7 @@ def processar_dados_em_background(data):
 #======================================
     # ENVIO DE COMANDOS
 #======================================
-@app.route('/api/comandos', methods=['GET'])
+"""@app.route('/api/comandos', methods=['GET'])
 def obter_comandos():
     api_key = request.args.get('api_key')
     if not api_key or api_key not in API_KEYS:
@@ -3279,7 +3279,7 @@ def obter_comandos():
         if comandos_pendentes:
             return jsonify({"comando": comandos_pendentes.pop(0)})
     return jsonify({"comando": ""})
-
+"""
 # -----------------------------
 # Rotas de dashboard e status
 # -----------------------------
