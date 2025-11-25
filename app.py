@@ -197,6 +197,60 @@ class ReleLog(db.Model):
             "modo_operacao": self.modo_operacao,
             "saldo_kwh": self.saldo_kwh
         }
+
+class Configuracao(db.Model):
+    __tablename__ = 'configuracoes'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # ==========================================================
+    # CONFIGURAÇÕES DE LIMITES E CONSUMO
+    # ==========================================================
+    limite_pzem1 = db.Column(db.Float, default=1000.0)
+    limite_pzem2 = db.Column(db.Float, default=1000.0)
+    preco_kwh = db.Column(db.Float, default=0.75)
+    saldo_kwh = db.Column(db.Float, default=0.0)
+    prioridade_minima_emergencia = db.Column(db.Integer, default=3)
+    
+    # ==========================================================
+    # CONFIGURAÇÕES FINANCEIRAS E TAXAS
+    # ==========================================================
+    taxa_lixo = db.Column(db.Float, default=5.0)  # MZN fixos
+    taxa_radio = db.Column(db.Float, default=3.0)  # MZN fixos
+    iva_percent = db.Column(db.Float, default=16.0)  # Percentual
+    
+    # ==========================================================
+    # CONFIGURAÇÕES DE NOTIFICAÇÃO - TELEGRAM
+    # ==========================================================
+    telegram_bot_token = db.Column(db.String(200), default='')
+    telegram_chat_id = db.Column(db.String(50), default='')
+    notify_telegram = db.Column(db.Boolean, default=False)
+    
+    # ==========================================================
+    # CONFIGURAÇÕES DE NOTIFICAÇÃO - EMAIL
+    # ==========================================================
+    smtp_server = db.Column(db.String(100), default='smtp.gmail.com')
+    smtp_port = db.Column(db.Integer, default=587)
+    email_sender = db.Column(db.String(120), default='')
+    email_password = db.Column(db.String(200), default='')
+    email_notificacao = db.Column(db.String(120), default='admin@example.com')
+    notify_email = db.Column(db.Boolean, default=True)
+    email_frequency = db.Column(db.String(20), default='immediate')
+    
+    # ==========================================================
+    # CONFIGURAÇÕES DE NOTIFICAÇÃO - BROWSER
+    # ==========================================================
+    notify_browser = db.Column(db.Boolean, default=True)
+    
+    # ==========================================================
+    # CONFIGURAÇÕES DE ALERTAS ESPECÍFICOS
+    # ==========================================================
+    alert_saldo_baixo = db.Column(db.Boolean, default=True)
+    alert_consumo_pico = db.Column(db.Boolean, default=True)
+    alert_reles_desligados = db.Column(db.Boolean, default=True)
+    alert_pzem_offline = db.Column(db.Boolean, default=True)
+    alert_erro_sistema = db.Column(db.Boolean, default=True)
+    saldo_baixo_limite = db.Column(db.Float, default=5.0)
+    
 # ==========================================================
 # ROTAS DE CONFIGURAÇÃO DE NOTIFICAÇÕES
 # ==========================================================
